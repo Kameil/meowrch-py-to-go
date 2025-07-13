@@ -1,5 +1,8 @@
 package main
 
+// The program was created by DIMFLIX (Modified by K1rsN7)
+// Github: https://github.com/DIMFLIX-OFFICIAL
+
 import (
 	"bufio"
 	"context"
