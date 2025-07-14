@@ -12,6 +12,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -177,12 +178,41 @@ func round(val float64, precision int) float64 {
 	return math.Round(val*factor) / factor
 }
 
+func searchGpuPath() string {
+	drmPath := "/sys/class/drm"
+	dirs, err := os.ReadDir(drmPath)
+	if err != nil {
+		panic(err)
+	}
+	re := regexp.MustCompile(`^card\d+$`)
+	var gpuPath string
+	for _, dir := range dirs {
+
+		fullPath := filepath.Join(drmPath, dir.Name())
+
+		info, err := os.Stat(fullPath)
+		if err != nil {
+			continue
+		}
+
+		if info.IsDir() {
+			if re.MatchString(dir.Name()) {
+				gpuPath = filepath.Join(drmPath, dir.Name())
+			}
+		}
+	}
+	return gpuPath
+
+}
+
 func GpuGetInfo() GpuInfo {
+
+	gpuPath := searchGpuPath()
 	ctx := context.Background()
 	gpus, err := gputil.GetGPUs(ctx)
 	if err != nil {
 		gpuName := "N/A"
-		file, err := os.ReadFile("/sys/class/drm/card1/device/hwmon/hwmon1/temp1_input")
+		file, err := os.ReadFile(filepath.Join(gpuPath, "device", "hwmon", "hwmon1", "temp1_input"))
 		if err != nil {
 			panic(err)
 		}
@@ -193,7 +223,7 @@ func GpuGetInfo() GpuInfo {
 		}
 		gpuTemp := ValInt / 1000
 
-		percentFile, err := os.ReadFile("/sys/class/drm/card1/device/gpu_busy_percent")
+		percentFile, err := os.ReadFile(filepath.Join(gpuPath, "device", "gpu_busy_percent"))
 		if err != nil {
 			panic(err)
 		}
