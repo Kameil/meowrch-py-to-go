@@ -317,7 +317,12 @@ func SetSystemInfoConfig(configPath, cpuMode, gpuMode string) {
 }
 
 func main() {
-	systemConfigPath := "/home/raco/.cache/meowrch/system-info.ini"
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("error getting userhome directory")
+		panic(err)
+	}
+	systemConfigPath := filepath.Join(homeDir, ".cache/meowrch/system-info.ini")
 	cpuMode, gpuMode := GetSystemInfoConfig(systemConfigPath)
 
 	val := os.ExpandEnv("$XDG_SESSION_TYPE")
