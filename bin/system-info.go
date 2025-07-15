@@ -87,6 +87,7 @@ func getIcons(percentVal float64, tempVal float64) Valicons {
 }
 
 func getCPUTempDirect() (float64, error) {
+	// isso precisa ser mudado pelo usuario, pois nao achei biblioteca para pegar os sensores e eu fiquei com preguica
 	data, err := os.ReadFile("/sys/class/thermal/thermal_zone2/temp")
 	if err != nil {
 		return 0, err
@@ -205,14 +206,31 @@ func searchGpuPath() string {
 
 }
 
+func gpuGetHwmon(gpuPath string) string {
+	dirs, err := os.ReadDir(filepath.Join(gpuPath, "device", "hwmon"))
+	if err != nil {
+		fmt.Println("erro getting gpu hwmon directory")
+		panic(err)
+	}
+	var hwmonName string = "hwmon0"
+	for _, dir := range dirs {
+		if strings.Contains(dir.Name(), "hwmon") {
+			hwmonName = dir.Name()
+			return hwmonName
+		}
+	}
+	return hwmonName
+}
+
 func GpuGetInfo() GpuInfo {
 
 	gpuPath := searchGpuPath()
+	gpuHwmonName := gpuGetHwmon(gpuPath)
 	ctx := context.Background()
 	gpus, err := gputil.GetGPUs(ctx)
 	if err != nil {
 		gpuName := "N/A"
-		file, err := os.ReadFile(filepath.Join(gpuPath, "device", "hwmon", "hwmon1", "temp1_input"))
+		file, err := os.ReadFile(filepath.Join(gpuPath, "device", "hwmon", gpuHwmonName, "temp1_input"))
 		if err != nil {
 			panic(err)
 		}
