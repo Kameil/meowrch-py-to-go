@@ -92,7 +92,7 @@ func cpuSearchThermalPathIntel() (string, error) {
 
 	dirs, err := os.ReadDir(thermalPath)
 	if err != nil {
-		return "", fmt.Errorf(`error reading "/sys/class/thermal"thermal directory: %w`, err)
+		return "", fmt.Errorf(`Error reading "/sys/class/thermal"thermal directory: %w`, err)
 	}
 
 	re := regexp.MustCompile(`^thermal_zone\d+$`)
@@ -108,7 +108,7 @@ func cpuSearchThermalPathIntel() (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("thermal_zone not found.")
+	return "", fmt.Errorf("Thermal_zone not found. thermal_path=\"%s\"", thermalPath)
 
 }
 
@@ -236,7 +236,7 @@ func searchGpuPath() (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("Path to amdgpu not found in /sys/class/drm")
+	return "", fmt.Errorf("Path to amdgpu not found. drm_path=\"%s\"", drmPath)
 
 }
 
@@ -387,7 +387,7 @@ func SetSystemInfoConfig(configPath, cpuMode, gpuMode string) {
 func main() {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		panic(fmt.Errorf("MAIN: error getting userhome directory: %w", err))
+		panic(fmt.Errorf("Main: Error getting User home directory: %w", err))
 	}
 
 	systemConfigPath := filepath.Join(homeDir, ".cache/meowrch/system-info.ini")
