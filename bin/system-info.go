@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -99,7 +100,7 @@ func cpuSearchThermalPathIntel() (string, error) {
 		if re.MatchString(dir.Name()) {
 			file, err := os.ReadFile(filepath.Join(thermalPath, dir.Name(), "type"))
 			if err != nil {
-				panic(fmt.Errorf("error reading type of %s: %w", dir.Name(), err))
+				return "", fmt.Errorf("error reading type of %s: %w", dir.Name(), err)
 			}
 			thermalType := strings.TrimSpace(string(file))
 			if thermalType == "x86_pkg_temp" {
@@ -131,10 +132,12 @@ func getCPUTempDirect() (float64, error) {
 func CpuGetInfo() CpuInfo {
 	Percent, err := cpu.Percent(time.Second, false)
 	if err != nil {
+		log.Println("CPU: error getting cpu usage percent: ", err)
 		panic(err)
 	}
 	file, err := os.Open("/proc/cpuinfo")
 	if err != nil {
+		log.Println("CPU: error opening file /proc/cpuinfo: ", err)
 		panic(err)
 	}
 	defer file.Close()
@@ -147,7 +150,8 @@ func CpuGetInfo() CpuInfo {
 			if err.Error() == "EOF" {
 				break
 			}
-			panic(err)
+			log.Println("CPU: error reading line in file /proc/cpuinfo: ", err)
+			panic(fmt.Errorf("CPU: error reading line in file /proc/cpuinfo: %w", err))
 		}
 		if strings.Contains(line, "name") {
 			line = strings.Split(line, ":")[1]
@@ -159,7 +163,8 @@ func CpuGetInfo() CpuInfo {
 
 	temp, err := getCPUTempDirect()
 	if err != nil {
-		temp = 0.0 // Default to 0 if unable to read temperature
+		log.Println("CPU: erro getting temperature: ", err)
+		temp = 0.0
 	}
 	return CpuInfo{
 		Percent:  Percent[0],
@@ -172,7 +177,8 @@ func CpuGetInfo() CpuInfo {
 func RamGetInfo() RamInfo {
 	svmem, err := mem.VirtualMemory()
 	if err != nil {
-		panic(err)
+		log.Println(`RAM: error in "svmem, err := mem.VirtualMemory()"\nerror getting RAM information: `, err)
+		panic(fmt.Errorf("error getting RAM information: %w", err))
 	}
 
 	total := fmt.Sprintf("%.2f", float64(svmem.Total)/(1024.0*1024.0*1024.0))
@@ -211,7 +217,7 @@ func searchGpuPath() (string, error) {
 	drmPath := "/sys/class/drm"
 	dirs, err := os.ReadDir(drmPath)
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("Error reading /sys/class/drm directory: %w", err)
 	}
 	re := regexp.MustCompile(`^card\d+$`)
 	for _, dir := range dirs {
@@ -230,50 +236,58 @@ func searchGpuPath() (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("path to amdgpu not found in /sys/class/drm")
+	return "", fmt.Errorf("Path to amdgpu not found in /sys/class/drm")
 
 }
 
-func gpuGetHwmon(gpuPath string) string {
+func gpuGetHwmon(gpuPath string) (string, error) {
 	dirs, err := os.ReadDir(filepath.Join(gpuPath, "device", "hwmon"))
 	if err != nil {
-		fmt.Println("erro getting gpu hwmon directory")
-		panic(err)
+		return "", fmt.Errorf("error getting gpu hwmon directory from gpu path: %w", err)
 	}
 	var hwmonName string = "hwmon0"
 	for _, dir := range dirs {
 		if strings.Contains(dir.Name(), "hwmon") {
 			hwmonName = dir.Name()
-			return hwmonName
+			return hwmonName, nil
 		}
 	}
-	return hwmonName
+	return "", fmt.Errorf("unable to found gpu hwmon directory from gpu path")
+
 }
 
 func GpuGetInfo() GpuInfo {
 
 	gpuPath, err := searchGpuPath()
 	if err != nil {
+		log.Println("GPU - AMD: ", err)
 		panic(err)
 	}
-	gpuHwmonName := gpuGetHwmon(gpuPath)
+	gpuHwmonName, err := gpuGetHwmon(gpuPath)
+	if err != nil {
+		log.Println("GPU - AMD: ", err)
+		panic(err)
+	}
 	ctx := context.Background()
 	gpus, err := gputil.GetGPUs(ctx)
 	if err != nil {
 		gpuName := "N/A"
 		file, err := os.ReadFile(filepath.Join(gpuPath, "device", "hwmon", gpuHwmonName, "temp1_input"))
 		if err != nil {
+			log.Printf("GPU - AMD: error reading gpu temp input %s: %v", filepath.Join(gpuPath, "device", "hwmon", gpuHwmonName, "temp1_input"), err)
 			panic(err)
 		}
-		valStr := strings.TrimSpace(string(file))
-		ValInt, err := strconv.Atoi(valStr)
+		gpuTempValStr := strings.TrimSpace(string(file))
+		gpuTempValInt, err := strconv.Atoi(gpuTempValStr)
 		if err != nil {
+			log.Println("GPU - AMD: error converting gpu temp_input value to int: ", err)
 			panic(err)
 		}
-		gpuTemp := ValInt / 1000
+		gpuTemp := gpuTempValInt / 1000
 
 		percentFile, err := os.ReadFile(filepath.Join(gpuPath, "device", "gpu_busy_percent"))
 		if err != nil {
+			log.Printf("GPU - AMD: error reading gpu busy percent file %s: %v", filepath.Join(gpuPath, "device", "gpu_busy_percent"), err)
 			panic(err)
 		}
 		percentValStr := strings.TrimSpace(string(percentFile))
@@ -291,9 +305,14 @@ func GpuGetInfo() GpuInfo {
 		gpu := gpus[0]
 		gpuName := gpu.Name
 		percentStr, err := strconv.Atoi(gpu.UtilizationGPU)
+		if err != nil {
+			log.Println("GPU - NVIDIA: error converting gpu utilization to int: ", err)
+			panic(fmt.Errorf("error converting gpu utilization to int: %w", err))
+		}
 		gpuTemp, err := strconv.Atoi(gpu.Temperature)
 		if err != nil {
-			panic(err)
+			log.Println("GPU - NVIDIA: error converting gpu temperature to int: ", err)
+			panic(fmt.Errorf("error converting gpu temperature to int: %w", err))
 		}
 		return GpuInfo{
 			Name:    gpuName,
@@ -368,11 +387,16 @@ func SetSystemInfoConfig(configPath, cpuMode, gpuMode string) {
 func main() {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Println("error getting userhome directory")
-		panic(err)
+		panic(fmt.Errorf("MAIN: error getting userhome directory: %w", err))
 	}
+
 	systemConfigPath := filepath.Join(homeDir, ".cache/meowrch/system-info.ini")
 	cpuMode, gpuMode := GetSystemInfoConfig(systemConfigPath)
+	logFile, err := os.OpenFile(filepath.Join(homeDir, ".cache", "meowrch", "system-info.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatal("error opening log file:", err)
+	}
+	log.SetOutput(logFile)
 
 	val := os.ExpandEnv("$XDG_SESSION_TYPE")
 	var sessionType *string
