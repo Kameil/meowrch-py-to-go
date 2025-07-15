@@ -256,6 +256,21 @@ func gpuGetHwmon(gpuPath string) (string, error) {
 
 }
 
+func hwmonGetFirstTempInput(hwmonName string) (string, error) {
+	hwmonDirectory := filepath.Join("/sys/class", "hwmon", hwmonName)
+	files, err := os.ReadDir(hwmonDirectory)
+	if err != nil {
+		return "", fmt.Errorf("error reading hwmon directory. hwmonDirectory = \"%s\": %w", hwmonDirectory, err)
+	}
+	re := regexp.MustCompile(`^temp\d+_input`)
+	for _, file := range files {
+		if re.MatchString(file.Name()) {
+			return file.Name(), nil
+		}
+	}
+	return "", fmt.Errorf(`temp\d+_input not found in hwmon directory %s`, hwmonDirectory)
+}
+
 func GpuGetInfo() GpuInfo {
 
 	gpuPath, err := searchGpuPath()
@@ -268,11 +283,15 @@ func GpuGetInfo() GpuInfo {
 		log.Println("GPU - AMD: ", err)
 		panic(err)
 	}
+	gpuTempInput, err := hwmonGetFirstTempInput(gpuHwmonName)
+	if err != nil {
+		log.Println("GPU - AMD: ", err)
+	}
 	ctx := context.Background()
 	gpus, err := gputil.GetGPUs(ctx)
 	if err != nil {
 		gpuName := "N/A"
-		file, err := os.ReadFile(filepath.Join(gpuPath, "device", "hwmon", gpuHwmonName, "temp1_input"))
+		file, err := os.ReadFile(filepath.Join(gpuPath, "device", "hwmon", gpuHwmonName, gpuTempInput))
 		if err != nil {
 			log.Printf("GPU - AMD: error reading gpu temp input %s: %v", filepath.Join(gpuPath, "device", "hwmon", gpuHwmonName, "temp1_input"), err)
 			panic(err)
