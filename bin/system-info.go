@@ -114,7 +114,7 @@ func cpuSearchThermalPathIntel() (string, error) {
 func getCPUTempDirect() (float64, error) {
 	thermalPath, err := cpuSearchThermalPathIntel()
 	if err != nil {
-		panic(err)
+		return 0, err
 	}
 	data, err := os.ReadFile(filepath.Join(thermalPath, "temp"))
 	if err != nil {
