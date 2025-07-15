@@ -207,14 +207,13 @@ func round(val float64, precision int) float64 {
 	return math.Round(val*factor) / factor
 }
 
-func searchGpuPath() string {
+func searchGpuPath() (string, error) {
 	drmPath := "/sys/class/drm"
 	dirs, err := os.ReadDir(drmPath)
 	if err != nil {
 		panic(err)
 	}
 	re := regexp.MustCompile(`^card\d+$`)
-	var gpuPath string
 	for _, dir := range dirs {
 
 		fullPath := filepath.Join(drmPath, dir.Name())
@@ -226,11 +225,12 @@ func searchGpuPath() string {
 
 		if info.IsDir() {
 			if re.MatchString(dir.Name()) {
-				gpuPath = filepath.Join(drmPath, dir.Name())
+				gpuPath := filepath.Join(drmPath, dir.Name())
+				return gpuPath, nil
 			}
 		}
 	}
-	return gpuPath
+	return "", fmt.Errorf("path to amdgpu not found in /sys/class/drm")
 
 }
 
@@ -252,7 +252,10 @@ func gpuGetHwmon(gpuPath string) string {
 
 func GpuGetInfo() GpuInfo {
 
-	gpuPath := searchGpuPath()
+	gpuPath, err := searchGpuPath()
+	if err != nil {
+		panic(err)
+	}
 	gpuHwmonName := gpuGetHwmon(gpuPath)
 	ctx := context.Background()
 	gpus, err := gputil.GetGPUs(ctx)
