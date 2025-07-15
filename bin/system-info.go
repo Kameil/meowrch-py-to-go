@@ -86,9 +86,37 @@ func getIcons(percentVal float64, tempVal float64) Valicons {
 	}
 }
 
+func cpuSearchThermalPathIntel() (string, error) {
+	thermalPath := "/sys/class/thermal"
+
+	dirs, err := os.ReadDir(thermalPath)
+	if err != nil {
+		return "", fmt.Errorf(`error reading "/sys/class/thermal"thermal directory: %w`, err)
+	}
+
+	re := regexp.MustCompile(`^thermal_zone\d+$`)
+	for _, dir := range dirs {
+		if re.MatchString(dir.Name()) {
+			file, err := os.ReadFile(filepath.Join(thermalPath, dir.Name(), "type"))
+			if err != nil {
+				panic(fmt.Errorf("error reading type of %s: %w", dir.Name(), err))
+			}
+			thermalType := strings.TrimSpace(string(file))
+			if thermalType == "x86_pkg_temp" {
+				return filepath.Join(thermalPath, dir.Name()), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("thermal_zone not found.")
+
+}
+
 func getCPUTempDirect() (float64, error) {
-	// isso precisa ser mudado pelo usuario, pois nao achei biblioteca para pegar os sensores e eu fiquei com preguica
-	data, err := os.ReadFile("/sys/class/thermal/thermal_zone2/temp")
+	thermalPath, err := cpuSearchThermalPathIntel()
+	if err != nil {
+		panic(err)
+	}
+	data, err := os.ReadFile(filepath.Join(thermalPath, "temp"))
 	if err != nil {
 		return 0, err
 	}
