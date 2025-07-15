@@ -1,6 +1,6 @@
 package main
 
-// original code was created by DIMFLIX (Modified by K1rsN7)
+// original code was created by DIMFLIX (Modified by K1rsN7) (rewritten in go by Kameil)
 // Github: https://github.com/DIMFLIX
 
 import (
