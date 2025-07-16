@@ -286,6 +286,7 @@ func GpuGetInfo() GpuInfo {
 	gpuTempInput, err := hwmonGetFirstTempInput(gpuHwmonName)
 	if err != nil {
 		log.Println("GPU - AMD: ", err)
+		panic(err)
 	}
 	ctx := context.Background()
 	gpus, err := gputil.GetGPUs(ctx)
